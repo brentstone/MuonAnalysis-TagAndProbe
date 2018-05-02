@@ -8,12 +8,16 @@ void addNewJetActParams() {
     TTree *tIn  = (TTree *) gFile->Get("tpTree/fitter_tree");
     float MDch_eta, MDnt_eta, MDpuch_eta, MDph_eta, MDch_pt, MDnt_pt, MDpuch_pt, MDph_pt, MDch_phi, MDnt_phi, MDpuch_phi, MDph_phi, MDch_mass, MDnt_mass, MDpuch_mass, MDph_mass;
     float SMch_eta, SMnt_eta, SMpuch_eta, SMph_eta, SMch_pt, SMnt_pt, SMpuch_pt, SMph_pt, SMch_phi, SMnt_phi, SMpuch_phi, SMph_phi, SMch_mass, SMnt_mass, SMpuch_mass, SMph_mass;
-    float rho, pt, eta, phi, r_iso;
+    float rho, pt, eta, phi, r_iso, tag_pt, tag_eta, tag_phi;
 
     tIn->SetBranchAddress("fixedGridRhoFastjetCentralNeutral",     &rho);
     tIn->SetBranchAddress("pt", &pt);
     tIn->SetBranchAddress("eta", &eta);
     tIn->SetBranchAddress("phi", &phi);
+    tIn->SetBranchAddress("tag_pt", &tag_pt);
+    tIn->SetBranchAddress("tag_eta", &tag_eta);
+    tIn->SetBranchAddress("tag_phi", &tag_phi);    
+
     tIn->SetBranchAddress("R_miniIsoCone", &r_iso);
 
     tIn->SetBranchAddress("MiniToDeadConeEta_Charged", &MDch_eta);
@@ -60,7 +64,8 @@ void addNewJetActParams() {
     TFile *fOut = new TFile("tnpZ_withNewJetVars.root", "RECREATE");
     fOut->mkdir("tpTree")->cd();
     TTree *tOut = tIn->CloneTree(0);
-    Float_t dR_lepact, dR_lepactNORM, PtRatio_lepact;
+    Float_t dR_lepact, dR_lepactNORM, PtRatio_lepact, dR_tagprobe;
+    tOut->Branch("dR_tagprobe", &dR_tagprobe, "dR_tagprobe/F");
     tOut->Branch("dR_lepact", &dR_lepact, "dR_lepact/F");
     tOut->Branch("dR_lepactNORM", &dR_lepactNORM, "dR_lepactNORM/F");
     tOut->Branch("PtRatio_lepact", &PtRatio_lepact, "PtRatio_lepact/F");
@@ -73,9 +78,10 @@ void addNewJetActParams() {
         Float_t ea_tot = MuonEffectiveArea::GetMuonEffectiveArea(effAreaType, fabs(eta), effAreaTarget);
 
         TLorentzVector MDmom_ch, MDmom_puch, MDmom_nt, MDmom_ph, SMmom_ch, SMmom_puch, SMmom_nt, SMmom_ph, Mom_ch, Mom_puch, Mom_nt, Mom_ph;
-        TLorentzVector MomForDR, probemom;
+        TLorentzVector MomForDR, probemom, tagmom;
 
         probemom.SetPtEtaPhiM(pt, eta, phi, 0.105);
+	tagmom.SetPtEtaPhiM(tag_pt, tag_eta, tag_phi, 0.105);
 
         MDmom_ch.SetPtEtaPhiM(MDch_pt, MDch_eta, MDch_phi, MDch_mass);
         MDmom_puch.SetPtEtaPhiM(MDpuch_pt, MDpuch_eta, MDpuch_phi, MDpuch_mass);
@@ -94,6 +100,7 @@ void addNewJetActParams() {
 
         MomForDR = Mom_ch + Mom_ph + Mom_nt + Mom_puch;
 
+	dR_tagprobe = probemom.DeltaR(tagmom);
         dR_lepact = probemom.DeltaR(MomForDR);
 	dR_lepactNORM = dR_lepact / r_iso;
         PtRatio_lepact = (Mom_ch.Pt() + max(0.0, Mom_ph.Pt() + Mom_nt.Pt() - rho*ea_tot*pow(0.4/0.3, 2)))/pt;
