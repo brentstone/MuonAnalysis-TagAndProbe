@@ -111,6 +111,17 @@ AddLeptonJetRelatedVariables::AddLeptonJetRelatedVariables(const edm::ParameterS
   produces<edm::ValueMap<float> >("JetPtRel");
   produces<edm::ValueMap<float> >("JetNDauCharged");
   produces<edm::ValueMap<float> >("JetBTagCSV");
+
+  // Added by Brent
+
+  produces<edm::ValueMap<float> >("RawJetMass");
+  produces<edm::ValueMap<float> >("RawJetPt");
+  produces<edm::ValueMap<float> >("RawJetEta");
+  produces<edm::ValueMap<float> >("RawJetPhi");
+  produces<edm::ValueMap<float> >("JECL1L2L3Res");
+
+  produces<edm::ValueMap<float> >("dRminiIsoCone");
+
 }
 
 AddLeptonJetRelatedVariables::~AddLeptonJetRelatedVariables()
@@ -161,6 +172,9 @@ AddLeptonJetRelatedVariables::produce(edm::Event& iEvent, const edm::EventSetup&
 
   //Output
   std::vector<float> ptratio,ptrel,nchargeddaughers,btagcsv;
+  std::vector<float> rawjetpt, rawjeteta, rawjetphi, rawjetmass, jec123, dr_miniIsoCone; // Added by Brent
+
+  // loop over all leptons
   for( reco::CandidateView::const_iterator icand = leptons->begin(); icand != leptons->end(); ++ icand){
 
     //Initialise loop variables
@@ -169,48 +183,61 @@ AddLeptonJetRelatedVariables::produce(edm::Event& iEvent, const edm::EventSetup&
     float bjet(-999.);
     int nchdaugthers(0);    
     double jecL1L2L3Res = 1.;
-    double jecL1 = 1.;
+//    double jecL1 = 1.;
     
-    for (reco::JetTagCollection::const_iterator tagI = bTags.begin(); 
-	 tagI != bTags.end(); ++tagI) {
+    // loop over all jet tags
+    for (reco::JetTagCollection::const_iterator tagI = bTags.begin(); tagI != bTags.end(); ++tagI) {
 
-      // for each muon with the lepton 
-      if(deltaR(*(tagI->first), *icand) > dR) continue;  
+
+      if(deltaR(*(tagI->first), *icand) > dR) continue;  // ensures we are keeping the closest jet by dR
       dR = deltaR(*(tagI->first), *icand);
-      
+
       mu  = icand->p4(); 
       jet = tagI->first->p4();
 
       jecL1L2L3Res = correctorL1L2L3Res->correction(*(tagI->first));
-      jecL1 = correctorL1->correction(*(tagI->first));
+//      jecL1 = correctorL1->correction(*(tagI->first));
 
       // Get b-jet info
       bjet = tagI->second;
       unsigned int ic=0;
       for (PFCollection::const_iterator iP = pfCandidates->begin(); iP !=pfCandidates->end(); ++iP){
-	ic++;
-	const reco::PFCandidate *pfcand = iP->get();
-	if (pfcand->charge()==0) continue;
-	if (deltaR(*tagI->first,*pfcand) > 0.4) continue;	
-	if (!pfcand->bestTrack()) continue;
-	if (!pfcand->bestTrack()->quality(reco::Track::highPurity)) continue;
-	if (pfcand->bestTrack()->pt()<1.) continue;
-	if (pfcand->bestTrack()->hitPattern().numberOfValidHits()<8) continue;
-	if (pfcand->bestTrack()->hitPattern().numberOfValidPixelHits()<2) continue;
-	if (pfcand->bestTrack()->normalizedChi2()>=5) continue;
+	       ic++;
+	       const reco::PFCandidate *pfcand = iP->get();
+	       if (pfcand->charge()==0) continue;
+	       if (deltaR(*tagI->first,*pfcand) > 0.4) continue;	
+	       if (!pfcand->bestTrack()) continue;
+	       if (!pfcand->bestTrack()->quality(reco::Track::highPurity)) continue;
+	       if (pfcand->bestTrack()->pt()<1.) continue;
+	       if (pfcand->bestTrack()->hitPattern().numberOfValidHits()<8) continue;
+	       if (pfcand->bestTrack()->hitPattern().numberOfValidPixelHits()<2) continue;
+	       if (pfcand->bestTrack()->normalizedChi2()>=5) continue;
 	
-	PV = reco::VertexRef(PVs, 0);
-	math::XYZPoint PVpos = PV->position();
+	       PV = reco::VertexRef(PVs, 0);
+	       math::XYZPoint PVpos = PV->position();
 
-	if (std::fabs(pfcand->bestTrack()->dxy(PVpos)) > 0.2) continue;
-	if (std::fabs(pfcand->bestTrack()->dz(PVpos)) > 17) continue;
-	nchdaugthers++;
+	       if (std::fabs(pfcand->bestTrack()->dxy(PVpos)) > 0.2) continue;
+	       if (std::fabs(pfcand->bestTrack()->dz(PVpos)) > 17) continue;
+	       nchdaugthers++;
       }
     }    
     //
     //Fill the pt ratio and pt rel
     //
+    TLorentzVector tmp_mu, tmp_jet, rawjet;
+    tmp_mu.SetPxPyPzE(mu.px(),mu.py(),mu.pz(),mu.E());
+
+    dr_miniIsoCone.push_back(std::max(0.05, std::min(0.2, 10.0/tmp_mu.Pt())));
+
+    rawjet.SetPxPyPzE(jet.px(),jet.py(),jet.pz(),jet.E());
+    rawjetpt.push_back(rawjet.Pt());
+    rawjeteta.push_back(rawjet.Eta());
+    rawjetphi.push_back(rawjet.Phi());
+    rawjetmass.push_back(rawjet.M());
+    jec123.push_back(jecL1L2L3Res);
+
     //No jets found
+
     if(dR > dRmax_){
       ptratio.push_back(-99);
       ptrel.push_back(-99);
@@ -219,20 +246,20 @@ AddLeptonJetRelatedVariables::produce(edm::Event& iEvent, const edm::EventSetup&
     }
     else{
       if ((jet-mu).Rho()<0.0001) 
-	jet=mu; 
+	       jet=mu; 
       else {
-	jet -= mu/jecL1;
-	jet *= jecL1L2L3Res;
-	jet += mu;
+	       jet -= mu; // fixed JEC here
+	       jet *= jecL1L2L3Res;
+               jet+= mu;
       }
+
       ptratio.push_back(mu.pt()/jet.pt());
-      TLorentzVector tmp_mu, tmp_jet;
-      tmp_mu.SetPxPyPzE(mu.px(),mu.py(),mu.pz(),mu.E());
       tmp_jet.SetPxPyPzE(jet.px(),jet.py(),jet.pz(),jet.E());
       if ((tmp_jet-tmp_mu).Rho()<0.0001)  ptrel.push_back(0.);
       else 	                          ptrel.push_back(tmp_mu.Perp((tmp_jet-tmp_mu).Vect()));
       btagcsv.push_back(bjet);
       nchargeddaughers.push_back(nchdaugthers);
+	
     }
 
     //    printf ("muon: %4.2f %4.2f %4.2f %4.2f %4.2f %4.2f %4.2f\n", mu.pt(),mu.eta(),mu.phi(), ptrel.back(), ptratio.back(), nchargeddaughers.back(), btagcsv.back());
@@ -247,6 +274,13 @@ AddLeptonJetRelatedVariables::produce(edm::Event& iEvent, const edm::EventSetup&
   storeMap(iEvent, leptons, nchargeddaughers, "JetNDauCharged");
   storeMap(iEvent, leptons, btagcsv, "JetBTagCSV");
 
+  storeMap(iEvent, leptons, rawjetmass, "RawJetMass");
+  storeMap(iEvent, leptons, rawjetpt, "RawJetPt");
+  storeMap(iEvent, leptons, rawjeteta, "RawJetEta");
+  storeMap(iEvent, leptons, rawjetphi, "RawJetPhi");
+  storeMap(iEvent, leptons, jec123, "JECL1L2L3Res");
+
+  storeMap(iEvent, leptons, dr_miniIsoCone, "dRminiIsoCone"); 
 }
 
 

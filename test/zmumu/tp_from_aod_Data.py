@@ -9,10 +9,45 @@ process.load('FWCore.MessageService.MessageLogger_cfi')
 process.options   = cms.untracked.PSet( wantSummary = cms.untracked.bool(True) )
 process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
+from FWCore.ParameterSet.VarParsing import VarParsing
+options = VarParsing('analysis')
+
+options.register('isCrab',
+                 None,
+                 VarParsing.multiplicity.singleton,
+                 VarParsing.varType.bool,
+                 "Input isCrab")
+
+options.register('sample',
+                 "NONE",
+                 VarParsing.multiplicity.singleton,
+                 VarParsing.varType.string,
+                 "Input sample")
+
+options.register('dataRun',
+                 "NONE",
+                 VarParsing.multiplicity.singleton,
+                 VarParsing.varType.string,
+                 "Input dataRun")
+
+options.register('skipEvents',
+                 0,
+                 VarParsing.multiplicity.singleton,
+                 VarParsing.varType.int,
+                 "Number of events to skip in processing")
+
+options.parseArguments()
+
+isCrab  = options.isCrab
+dataRun = options.dataRun
+sample  = options.sample
+
+isRealData = (dataRun != "NONE")
+
 process.source = cms.Source("PoolSource", 
     fileNames = cms.untracked.vstring(),
 )
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10) )
 
 process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
 process.load('Configuration.StandardSequences.MagneticField_cff')
@@ -61,19 +96,27 @@ elif "CMSSW_7_6_" in os.environ['CMSSW_VERSION']:
             '/store/data/Run2015D/SingleMuon/AOD/16Dec2015-v1/10000/24537A2D-0BA8-E511-8D7C-20CF300E9ECF.root',
     ]
 elif "CMSSW_8_0_"in os.environ['CMSSW_VERSION']:
-    process.GlobalTag.globaltag = cms.string('80X_dataRun2_Prompt_v9')
+    if isRealData:
+        if 'Run2016H' in dataRun:
+            globalTag = cms.string('80X_dataRun2_Prompt_v16')  #https://twiki.cern.ch/twiki/bin/view/CMSPublic/WorkBookMiniAOD
+        else:
+            globalTag = cms.string('80X_dataRun2_2016SeptRepro_v7') #https://twiki.cern.ch/twiki/bin/view/CMS/JECDataMC#Jet_Energy_Corrections_in_Run2, https://twiki.cern.ch/twiki/bin/view/CMSPublic/WorkBookMiniAOD
+    else :        
+        globalTag = cms.string('80X_mcRun2_asymptotic_2016_TrancheIV_v8') #https://twiki.cern.ch/twiki/bin/view/CMS/JECDataMC#Jet_Energy_Corrections_in_Run2
+
+    process.GlobalTag.globaltag = globalTag
 
     process.source.fileNames = [
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/0001E5C0-AE44-E611-9F88-02163E014235.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/007E4250-AE44-E611-867E-02163E011AB6.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/00997A4B-B044-E611-9FBB-02163E011EDE.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/02BB51AA-B044-E611-8DB0-02163E014168.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/0466BA91-AE44-E611-825B-02163E0136EF.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/0485506E-AE44-E611-A24B-02163E0140ED.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/0494A580-B044-E611-993A-02163E012944.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/04C4B374-B044-E611-97D0-02163E011ECD.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/06056373-B044-E611-B41D-02163E0137AA.root',
-        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/064D926A-B044-E611-9CAA-02163E011FCC.root',
+#        '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/276/283/00000/0001E5C0-AE44-E611-9F88-02163E014235.root',
+	'/store/data/Run2016B/SingleMuon/AOD/23Sep2016-v3/00000/00500CC4-D797-E611-962C-008CFA56D6F4.root', 
+
+
+
+
+
+
+
+
         ]
  
 else: raise RuntimeError, "Unknown CMSSW version %s" % os.environ['CMSSW_VERSION']
@@ -208,6 +251,7 @@ process.tpTree = cms.EDAnalyzer("TagProbeFitTreeProducer",
         JetPtRel= cms.InputTag("AddLeptonJetRelatedVariables","JetPtRel"),
         JetNDauCharged= cms.InputTag("AddLeptonJetRelatedVariables","JetNDauCharged"),
         JetBTagCSV= cms.InputTag("AddLeptonJetRelatedVariables","JetBTagCSV"),
+
         miniIsoCharged = cms.InputTag("muonMiniIsoCharged","miniIso"),
         activity_miniIsoCharged = cms.InputTag("muonMiniIsoCharged","activity"),
         miniIsoPUCharged = cms.InputTag("muonMiniIsoPUCharged","miniIso"),
@@ -216,8 +260,69 @@ process.tpTree = cms.EDAnalyzer("TagProbeFitTreeProducer",
         activity_miniIsoNeutrals = cms.InputTag("muonMiniIsoNeutrals","activity"),
         miniIsoPhotons = cms.InputTag("muonMiniIsoPhotons","miniIso"),
         activity_miniIsoPhotons = cms.InputTag("muonMiniIsoPhotons","activity"),
+
+        # Added by BRENT
+        # ALLnoPU 4-momentum variables
+        DeadConePt_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "DeadConePt"),
+        DeadConeEta_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "DeadConeEta"),
+        DeadConePhi_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "DeadConePhi"),
+        DeadConeMass_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "DeadConeMass"),
+
+        MiniToDeadConePt_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "MiniToDeadConePt"),
+        MiniToDeadConeEta_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "MiniToDeadConeEta"),
+        MiniToDeadConePhi_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "MiniToDeadConePhi"),
+        MiniToDeadConeMass_ALLnoPU = cms.InputTag("muonMiniIsoALLnoPU", "MiniToDeadConeMass"),
+
+        # PU, CH, N, PH 4-momentum variables
+        MiniToDeadConePt_PUCharged = cms.InputTag("muonMiniIsoPUCharged","MiniToDeadConePt"),
+        MiniToDeadConePt_Charged = cms.InputTag("muonMiniIsoCharged","MiniToDeadConePt"),
+        MiniToDeadConePt_Neutral = cms.InputTag("muonMiniIsoNeutrals","MiniToDeadConePt"),
+        MiniToDeadConePt_Phot = cms.InputTag("muonMiniIsoPhotons","MiniToDeadConePt"),
+
+        MiniToDeadConeEta_PUCharged = cms.InputTag("muonMiniIsoPUCharged","MiniToDeadConeEta"),
+        MiniToDeadConeEta_Charged = cms.InputTag("muonMiniIsoCharged","MiniToDeadConeEta"),
+        MiniToDeadConeEta_Neutral = cms.InputTag("muonMiniIsoNeutrals","MiniToDeadConeEta"),
+        MiniToDeadConeEta_Phot = cms.InputTag("muonMiniIsoPhotons","MiniToDeadConeEta"),
+
+        MiniToDeadConePhi_PUCharged = cms.InputTag("muonMiniIsoPUCharged","MiniToDeadConePhi"),
+        MiniToDeadConePhi_Charged = cms.InputTag("muonMiniIsoCharged","MiniToDeadConePhi"),
+        MiniToDeadConePhi_Neutral = cms.InputTag("muonMiniIsoNeutrals","MiniToDeadConePhi"),
+        MiniToDeadConePhi_Phot = cms.InputTag("muonMiniIsoPhotons","MiniToDeadConePhi"),
+
+        MiniToDeadConeMass_PUCharged = cms.InputTag("muonMiniIsoPUCharged","MiniToDeadConeMass"),
+        MiniToDeadConeMass_Charged = cms.InputTag("muonMiniIsoCharged","MiniToDeadConeMass"),
+        MiniToDeadConeMass_Neutral = cms.InputTag("muonMiniIsoNeutrals","MiniToDeadConeMass"),
+        MiniToDeadConeMass_Phot = cms.InputTag("muonMiniIsoPhotons","MiniToDeadConeMass"),
+
+        SAtoMiniConePt_PUCharged = cms.InputTag("muonMiniIsoPUCharged","SAtoMiniConePt"),
+        SAtoMiniConePt_Charged = cms.InputTag("muonMiniIsoCharged","SAtoMiniConePt"),
+        SAtoMiniConePt_Neutral = cms.InputTag("muonMiniIsoNeutrals","SAtoMiniConePt"),
+        SAtoMiniConePt_Phot = cms.InputTag("muonMiniIsoPhotons","SAtoMiniConePt"),
+
+        SAtoMiniConeEta_PUCharged = cms.InputTag("muonMiniIsoPUCharged","SAtoMiniConeEta"),
+        SAtoMiniConeEta_Charged = cms.InputTag("muonMiniIsoCharged","SAtoMiniConeEta"),
+        SAtoMiniConeEta_Neutral = cms.InputTag("muonMiniIsoNeutrals","SAtoMiniConeEta"),
+        SAtoMiniConeEta_Phot = cms.InputTag("muonMiniIsoPhotons","SAtoMiniConeEta"),
+
+        SAtoMiniConePhi_PUCharged = cms.InputTag("muonMiniIsoPUCharged","SAtoMiniConePhi"),
+        SAtoMiniConePhi_Charged = cms.InputTag("muonMiniIsoCharged","SAtoMiniConePhi"),
+        SAtoMiniConePhi_Neutral = cms.InputTag("muonMiniIsoNeutrals","SAtoMiniConePhi"),
+        SAtoMiniConePhi_Phot = cms.InputTag("muonMiniIsoPhotons","SAtoMiniConePhi"),
+
+        SAtoMiniConeMass_PUCharged = cms.InputTag("muonMiniIsoPUCharged","SAtoMiniConeMass"),
+        SAtoMiniConeMass_Charged = cms.InputTag("muonMiniIsoCharged","SAtoMiniConeMass"),
+        SAtoMiniConeMass_Neutral = cms.InputTag("muonMiniIsoNeutrals","SAtoMiniConeMass"),
+        SAtoMiniConeMass_Phot = cms.InputTag("muonMiniIsoPhotons","SAtoMiniConeMass"),
+        
         nSplitTk  = cms.InputTag("splitTrackTagger"),
         mt  = cms.InputTag("probeMetMt","mt"),
+	# Added by Brent
+	RawJetMass = cms.InputTag("AddLeptonJetRelatedVariables", "RawJetMass"),
+        RawJetPt = cms.InputTag("AddLeptonJetRelatedVariables", "RawJetPt"),
+        RawJetEta = cms.InputTag("AddLeptonJetRelatedVariables", "RawJetEta"),
+        RawJetPhi = cms.InputTag("AddLeptonJetRelatedVariables", "RawJetPhi"),
+        JEC_L1L2L3Res = cms.InputTag("AddLeptonJetRelatedVariables", "JECL1L2L3Res"),
+        R_miniIsoCone = cms.InputTag("AddLeptonJetRelatedVariables", "dRminiIsoCone")
     ),
     flags = cms.PSet(
        TrackQualityFlags,
@@ -228,6 +333,7 @@ process.tpTree = cms.EDAnalyzer("TagProbeFitTreeProducer",
     tagVariables = cms.PSet(
      #   TriggerVariables, 
      #   MVAIsoVariablesPlainTag, 
+
      #   pt = cms.string("pt"),
      #   eta = cms.string("eta"),
      #   phi = cms.string("phi"),
@@ -290,7 +396,8 @@ process.miniIsoSeq = cms.Sequence(
     process.muonMiniIsoCharged + 
     process.muonMiniIsoPUCharged + 
     process.muonMiniIsoNeutrals + 
-    process.muonMiniIsoPhotons 
+    process.muonMiniIsoPhotons +
+    process.muonMiniIsoALLnoPU 
 )
 
 # process.load("JetMETCorrections.Configuration.JetCorrectionProducersAllAlgos_cff")
@@ -629,4 +736,4 @@ if TRIGGER == "SingleMu":
        process.fakeRateZPlusProbe,
     ])
 
-process.TFileService = cms.Service("TFileService", fileName = cms.string("tnpZ_Data.root"))
+process.TFileService = cms.Service('TFileService', fileName=cms.string(options.outputFile))
