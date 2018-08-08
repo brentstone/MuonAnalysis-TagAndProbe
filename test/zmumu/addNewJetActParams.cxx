@@ -98,7 +98,7 @@ void addNewJetActParams() {
         Mom_nt = MDmom_nt + SMmom_nt;
         Mom_ph = MDmom_ph + SMmom_ph;
 
-        MomForDR = Mom_ch + Mom_ph + Mom_nt + Mom_puch;
+        MomForDR = Mom_ch + Mom_ph + Mom_nt;
 
 	dR_tagprobe = probemom.DeltaR(tagmom);
         dR_lepact = probemom.DeltaR(MomForDR);
