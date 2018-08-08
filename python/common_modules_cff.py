@@ -132,7 +132,7 @@ muonMiniIsoPUCharged = cms.EDProducer("MuonMiniIso",
     pfCandidates = cms.InputTag("pfPileUpAllChargedParticlesPFBRECO"),
     dRCandProbeVeto = cms.double(0.01),
     dRCandSoftActivityCone = cms.double(0.4),
-    CandPtThreshold = cms.double(0.5),
+    CandPtThreshold = cms.double(0.0),
 )
 
 muonMiniIsoNeutrals = cms.EDProducer("MuonMiniIso",
